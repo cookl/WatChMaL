@@ -82,6 +82,15 @@ class ClassifierEngine:
         self.optimizer = None
         self.scheduler = None
     
+    def configure_loss(self, loss_config):
+        if 'weight' in loss_config:
+            weights = torch.tensor(loss_config.weight).to(self.device)
+            print(weights)
+            self.criterion = instantiate(loss_config,weight = weights)
+        else:
+            self.criterion = instantiate(loss_config)
+        
+    
     def configure_optimizers(self, optimizer_config):
         """Instantiate an optimizer from a hydra config."""
         self.optimizer = instantiate(optimizer_config, params=self.model_accs.parameters())

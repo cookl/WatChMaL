@@ -1,0 +1,3 @@
+split_path: /fast_scratch/lcook/WCTE_mu_scatter_class/CustMuonScatter_linE/index_sampling.npz
+dataset:
+  h5file: /fast_scratch/lcook/WCTE_mu_scatter_class/CustMuonScatter_linE/runUnifEnergy.h5

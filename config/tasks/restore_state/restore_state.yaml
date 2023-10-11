@@ -1,1 +1,1 @@
-weight_file: '/path/to/outputs/ClassifierBEST.pth'
+weight_file: '/fast_scratch/lcook/WCTE_mu_scatter_class/CustMuonScatter_linE/output/ClassifierBEST.pth'

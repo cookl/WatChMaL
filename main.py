@@ -21,6 +21,8 @@ import numpy as np
 
 from watchmal.utils.logging_utils import get_git_version
 
+from watchmal.engine.engine_classifier import ClassifierEngine
+
 logger = logging.getLogger('train')
 
 @hydra.main(config_path='config/', config_name='resnet_train')
@@ -122,6 +124,11 @@ def main_worker_function(rank, ngpus_per_node, is_distributed, config):
         if 'optimizers' in task_config:
             engine.configure_optimizers(task_config.optimizers)
 
+    # Configure loss
+    for task, task_config in config.tasks.items():
+        if 'loss' in task_config:
+            engine.configure_loss(task_config.loss)
+            
     # Configure scheduler
     for task, task_config in config.tasks.items():
         if 'scheduler' in task_config:

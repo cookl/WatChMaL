@@ -42,19 +42,19 @@ class CNNmPMTDataset(H5Dataset):
         transforms: sequence of string
             List of random transforms to apply to data before passing to CNN for data augmentation. Each element of the
             list should be the name of a method of this class that performs the transformation
-	mode: sequence of string
-	    List defines the PMT data included in the image-like CNN arrays. It can be either 'charge', 'time' or both (default)
+        mode: sequence of string
+            List defines the PMT data included in the image-like CNN arrays. It can be either 'charge', 'time' or both (default)
         collapse_mode: sequence of string
-	    List of the data to be collapsed to two channels, containing, respectively, the mean and the std of other channels. 
-	    i.e. provides the mean and the std of PMT charges and/or time in each mPMT instead of providing all PMT data.	
-	    It can be [], ['charge'], ['time'] or ['charge', 'time']. By default no collapsing is performed.
+            List of the data to be collapsed to two channels, containing, respectively, the mean and the std of other channels. 
+            i.e. provides the mean and the std of PMT charges and/or time in each mPMT instead of providing all PMT data.        
+            It can be [], ['charge'], ['time'] or ['charge', 'time']. By default no collapsing is performed.
         scaling_charge:[offset, scale]
-	    Offset and scale to standardise the PMT charge data
+            Offset and scale to standardise the PMT charge data
         scaling_time: [offset, scale]
-	    Offset and scale to standardise the PMT time data
+            Offset and scale to standardise the PMT time data
         ----------
-	"""
-	
+        """
+        
         super().__init__(h5file)
 
         self.mpmt_positions = np.load(mpmt_positions_file)['mpmt_image_positions']
@@ -74,7 +74,10 @@ class CNNmPMTDataset(H5Dataset):
         self.vertical_flip_mpmt_map = [6, 5, 4, 3, 2, 1, 0, 11, 10, 9, 8, 7, 15, 14, 13, 12, 17, 16, 18]
 
         self.mode = mode
-        self.collapse_mode = collapse_mode
+        if collapse_mode is not None:
+            self.collapse_mode = collapse_mode
+        else:
+            self.collapse_mode = []
         self.scaling_charge = scaling_charge
         self.scaling_time = scaling_time
 
@@ -128,7 +131,9 @@ class CNNmPMTDataset(H5Dataset):
                 hit_data = self.feature_scaling_std(hit_data, self.charge_offset, self.charge_scale)
             
             charge_image = from_numpy(self.process_data(self.event_hit_pmts, hit_data))
-            charge_image = self.padding_type(charge_image)
+            
+            if self.padding_type is not None:
+                charge_image = self.padding_type(charge_image)
         
         if 'time' in self.mode:
             hit_data = self.event_hit_times
@@ -136,35 +141,37 @@ class CNNmPMTDataset(H5Dataset):
                 hit_data = self.feature_scaling_std(hit_data, self.time_offset, self.time_scale)
 
             time_image = from_numpy(self.process_data(self.event_hit_pmts, hit_data))
-            time_image = self.padding_type(time_image)
+            
+            if self.padding_type is not None:
+                time_image = self.padding_type(time_image)
 
         # Merge all channels
         if ('time' in self.mode) and ('charge' in self.mode):
             processed_image = torch.cat((charge_image, time_image), 0)
-	    processed_image = du.apply_random_transformations(self.transforms, processed_image)
+            processed_image = du.apply_random_transformations(self.transforms, processed_image)
 
             charge_image = processed_image[:19, :, :]
-	    time_image = processed_image[19:, :, :]
-	    if 'charge' in self.collapse_mode:
-        	 mean_channel = torch.mean(charge_image, 0, keepdim=True)
+            time_image = processed_image[19:, :, :] 
+            if 'charge' in self.collapse_mode:
+                 mean_channel = torch.mean(charge_image, 0, keepdim=True)
                  std_channel = torch.std(charge_image, 0, keepdim=True)
                  charge_image = torch.cat((mean_channel, std_channel), 0)
-	    if 'time' in self.collapse_mode:
-		 mean_channel = torch.mean(time_image, 0, keepdim=True)
+            if 'time' in self.collapse_mode:
+                 mean_channel = torch.mean(time_image, 0, keepdim=True)
                  std_channel = torch.std(time_image, 0, keepdim=True)
                  time_image = torch.cat((mean_channel, std_channel), 0)
 
-	    processed_image = torch.cat((charge_image, time_image), 0)
+            processed_image = torch.cat((charge_image, time_image), 0)
 
         elif 'charge' in self.mode:
             processed_image = du.apply_random_transformations(self.transforms, charge_image)
-	    if 'charge' in self.collapse_mode:
-	        mean_channel = torch.mean(processed_image, 0, keepdim=True)
+            if 'charge' in self.collapse_mode:
+                mean_channel = torch.mean(processed_image, 0, keepdim=True)
                 std_channel = torch.std(processed_image, 0, keepdim=True)
                 processed_image = torch.cat((mean_channel, std_channel), 0)
         else:
             processed_image = du.apply_random_transformations(self.transforms, time_image)
-	    if 'time' in self.collapse_mode:
+            if 'time' in self.collapse_mode:
                  mean_channel = torch.mean(processed_image, 0, keepdim=True)
                  std_channel = torch.std(processed_image, 0, keepdim=True)
                  processed_image = torch.cat((mean_channel, std_channel), 0)
@@ -178,7 +185,7 @@ class CNNmPMTDataset(H5Dataset):
         Takes image-like data and returns the data after applying a horizontal flip to the image.
         The channels of the PMTs within mPMTs also have the appropriate permutation applied.
         """
- 	flip_mpmt_map = np.tile(self.horizontal_flip_mpmt_map, data.shape[0]/19)
+        flip_mpmt_map = np.tile(self.horizontal_flip_mpmt_map, int(data.shape[0]/19))
         return flip(data[flip_mpmt_map, :, :], [2])
 
     def vertical_flip(self, data):
@@ -186,7 +193,7 @@ class CNNmPMTDataset(H5Dataset):
         Takes image-like data and returns the data after applying a vertical flip to the image.
         The channels of the PMTs within mPMTs also have the appropriate permutation applied.
         """
-  	flip_mpmt_map = np.tile(self.vertical_flip_mpmt_map, data.shape[0]/19)
+        flip_mpmt_map = np.tile(self.vertical_flip_mpmt_map, int(data.shape[0]/19))
         return flip(data[flip_mpmt_map, :, :], [1])
 
     def flip_180(self, data):
@@ -327,7 +334,7 @@ class CNNmPMTDataset(H5Dataset):
         padded_data = torch.cat(concat_order, dim=1)
 
         return padded_data
-	
+        
     def feature_scaling_std(self, hit_array, offset, scale):
         """
             Scale data using standarization.
